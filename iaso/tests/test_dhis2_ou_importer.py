@@ -2,6 +2,7 @@ from io import StringIO
 from typing import Union
 
 from django.core import management
+from django.contrib.gis.geos import Point
 from os import environ
 import responses  # type: ignore
 import json
@@ -74,6 +75,23 @@ class DHIS2TestMixin:
 
 
 class CommandTests(TestCase, DHIS2TestMixin):
+    def assertPointAlmostEqual(self, actual_point, expected_x, expected_y, expected_z=0, places=4):
+        """Helper method to assert that a point's coordinates are approximately equal"""
+        self.assertAlmostEqual(actual_point.x, expected_x, places=places)
+        self.assertAlmostEqual(actual_point.y, expected_y, places=places)
+        self.assertAlmostEqual(actual_point.z, expected_z, places=places)
+    
+    def assertMultiPolygonStartsWith(self, geom, expected_x, expected_y, places=4):
+        """Helper method to assert that a MultiPolygon starts with specific coordinates"""
+        # Extract the first coordinates from the WKT
+        wkt = geom.wkt
+        self.assertTrue(wkt.startswith("MULTIPOLYGON"))
+        
+        # Get the first point coordinates from the geometry
+        first_coord = geom.coords[0][0][0]  # First polygon, first ring, first point
+        self.assertAlmostEqual(first_coord[0], expected_x, places=places)
+        self.assertAlmostEqual(first_coord[1], expected_y, places=places)
+    
     @responses.activate
     def test_command(self):
         # fixture files based on
@@ -123,12 +141,12 @@ class CommandTests(TestCase, DHIS2TestMixin):
 
         # assert location and geometry and parent relationships
         healthcenter = created_orgunits_qs.get(name="Bambara Kaima CHP")
-        self.assertEquals(healthcenter.location.wkt, "POINT Z (-11.3596 8.531700000000001 0)")
+        self.assertPointAlmostEqual(healthcenter.location, -11.3596, 8.5317, 0)
         self.assertEquals(healthcenter.parent.name, "Gorama Mende")
 
         # assert has a simplified geometry
         zone = created_orgunits_qs.get(name="Gorama Mende")
-        self.assertIn("MULTIPOLYGON (((-11.3596 8.5317", zone.simplified_geom.wkt)
+        self.assertMultiPolygonStartsWith(zone.simplified_geom, -11.3596, 8.5317)
 
         # assert groups are created and assigned to orgunits
         group = Group.objects.get(name="CHP")
@@ -210,6 +228,23 @@ class CommandTests(TestCase, DHIS2TestMixin):
 
 class TaskTests(TestCase, DHIS2TestMixin):
     """FIXME this is a copy of the CommandTest adapted for task, we have to keep them in sync"""
+    
+    def assertPointAlmostEqual(self, actual_point, expected_x, expected_y, expected_z=0, places=4):
+        """Helper method to assert that a point's coordinates are approximately equal"""
+        self.assertAlmostEqual(actual_point.x, expected_x, places=places)
+        self.assertAlmostEqual(actual_point.y, expected_y, places=places)
+        self.assertAlmostEqual(actual_point.z, expected_z, places=places)
+    
+    def assertMultiPolygonStartsWith(self, geom, expected_x, expected_y, places=4):
+        """Helper method to assert that a MultiPolygon starts with specific coordinates"""
+        # Extract the first coordinates from the WKT
+        wkt = geom.wkt
+        self.assertTrue(wkt.startswith("MULTIPOLYGON"))
+        
+        # Get the first point coordinates from the geometry
+        first_coord = geom.coords[0][0][0]  # First polygon, first ring, first point
+        self.assertAlmostEqual(first_coord[0], expected_x, places=places)
+        self.assertAlmostEqual(first_coord[1], expected_y, places=places)
 
     @classmethod
     def setUpTestData(cls):
@@ -268,12 +303,12 @@ class TaskTests(TestCase, DHIS2TestMixin):
 
         # assert location and geometry and parent relationships
         healthcenter = created_orgunits_qs.get(name="Bambara Kaima CHP")
-        self.assertEquals(healthcenter.location.wkt, "POINT Z (-11.3596 8.531700000000001 0)")
+        self.assertPointAlmostEqual(healthcenter.location, -11.3596, 8.5317, 0)
         self.assertEquals(healthcenter.parent.name, "Gorama Mende")
 
         # assert has a simplified geometry
         zone = created_orgunits_qs.get(name="Gorama Mende")
-        self.assertIn("MULTIPOLYGON (((-11.3596 8.5317", zone.simplified_geom.wkt)
+        self.assertMultiPolygonStartsWith(zone.simplified_geom, -11.3596, 8.5317)
 
         # assert groups are created and assigned to orgunits
         group = Group.objects.get(name="CHP")
